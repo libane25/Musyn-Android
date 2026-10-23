@@ -13,11 +13,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout original Musyn
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          repository: Voryn-Labs/Musyn
-          path: musyn-source
+
+      - name: Unpack Android port
+        run: unzip -q Musyn-Android-port.zip -d port
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -31,25 +31,31 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Check project
-        working-directory: musyn-source
-        run: test -f pubspec.yaml
-
-      - name: Generate Android files
-        working-directory: musyn-source
-        run: flutter create --platforms=android --org com.libane25 .
+      - name: Ensure Gradle wrapper
+        working-directory: port/Musyn-main
+        run: |
+          if [ ! -f android/gradlew ]; then
+            TMP="$(mktemp -d)"
+            flutter create --platforms=android --org com.vorynlabs --project-name musyn "$TMP/bootstrap"
+            mkdir -p android/gradle/wrapper
+            cp "$TMP/bootstrap/android/gradlew" android/gradlew
+            cp "$TMP/bootstrap/android/gradlew.bat" android/gradlew.bat
+            cp "$TMP/bootstrap/android/gradle/wrapper/gradle-wrapper.jar" android/gradle/wrapper/
+            cp "$TMP/bootstrap/android/gradle/wrapper/gradle-wrapper.properties" android/gradle/wrapper/
+            chmod +x android/gradlew
+          fi
 
       - name: Install dependencies
-        working-directory: musyn-source
+        working-directory: port/Musyn-main
         run: flutter pub get
 
       - name: Build APK
-        working-directory: musyn-source
+        working-directory: port/Musyn-main
         run: flutter build apk --release --target-platform android-arm64
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Musyn-Android-ARM64
-          path: musyn-source/build/app/outputs/flutter-apk/app-release.apk
+          path: port/Musyn-main/build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
